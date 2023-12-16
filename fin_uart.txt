@@ -1,0 +1,112 @@
+----------------------------------------------------------------------------------
+-- Course: ELEC3342
+-- Module Name: mucodec - Behavioral Testbench
+-- Project Name: Template for Music Code Decoder for Homework 1
+-- Created By: hso and jjwu
+--
+-- Copyright (C) 2023 Hayden So
+--
+-- This program is free software: you can redistribute it and/or modify
+-- it under the terms of the GNU General Public License as published by
+-- the Free Software Foundation, either version 3 of the License, or
+-- (at your option) any later version.
+--
+-- This program is distributed in the hope that it will be useful,
+-- but WITHOUT ANY WARRANTY; without even the implied warranty of
+-- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+-- GNU General Public License for more details.
+--
+-- You should have received a copy of the GNU General Public License
+-- along with this program.  If not, see <https://www.gnu.org/licenses/>.
+----------------------------------------------------------------------------------
+
+library IEEE;
+use IEEE.STD_LOGIC_1164.ALL;
+
+-- Uncomment the following library declaration if using
+-- arithmetic functions with Signed or Unsigned values
+use IEEE.NUMERIC_STD.ALL;
+
+-- Uncomment the following library declaration if instantiating
+-- any Xilinx leaf cells in this code.
+--library UNISIM;
+--use UNISIM.VComponents.all;
+
+entity myuart is
+    Port ( 
+           din : in STD_LOGIC_VECTOR (7 downto 0);
+           busy: out STD_LOGIC;
+           wen : in STD_LOGIC;
+           sout : out STD_LOGIC;
+           clr : in STD_LOGIC;
+           clk : in STD_LOGIC);
+end myuart;
+
+
+architecture rtl of myuart is
+    signal info_counter : integer := 0;
+    signal time_counter : integer := 0;
+    --transmit is used as flag and indication of 'busy' output, when '1' busy transmitting,0 not
+    signal transmit : std_logic := '0';
+
+begin
+    process (clk, clr)
+    begin
+        --clr = 1: clear and reset information
+        if clr = '1' then
+            transmit <= '0';
+            info_counter <= 0;
+            time_counter <= 0;
+            sout <= '1';
+        --clr = 0
+        else
+            if rising_edge(clk) then
+                --wen = 1 and not busy
+                if wen = '1' and transmit = '0' then
+                    --set transmit to 1, and start transmission
+                    transmit <= '1';
+                    --set counter4
+                    info_counter <= 0;
+                    time_counter <= 0;
+                end if;
+                
+                -- transmit = '1': UART is busy, in transmission progress
+                if transmit = '1' then
+                    if time_counter < 9 then
+                        if info_counter = 0 then
+                            sout <= '0';
+                        elsif info_counter = 9 then
+                            sout <= '1';
+                        else
+                            sout <= din(info_counter-1);
+                        end if;
+                        time_counter <= time_counter + 1;
+                    --time up
+                    elsif time_counter = 9 then
+                        --reset time count
+                        time_counter <= 0;
+                        --if current output is stop bit
+                        if info_counter = 9 then
+                            info_counter <= 0;
+                            --idle
+                            sout <= '1';
+                            transmit <= '0';
+                        else
+                            info_counter <= info_counter + 1;
+                            if info_counter = 0 then
+                                sout <= '0';
+                            elsif info_counter = 9 then
+                                sout <= '1';
+                            else
+                                sout <= din(info_counter - 1);
+                            end if;
+                        end if;
+                    end if;  
+                end if;
+                --update busy state
+                busy <= transmit;
+            end if;
+        end if;
+    end process;
+end rtl;
+

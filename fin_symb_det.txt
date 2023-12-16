@@ -1,0 +1,130 @@
+----------------------------------------------------------------------------------
+-- Company: Computer Architecture and System Research (CASR), HKU, Hong Kong
+-- Engineer: Jiajun Wu
+-- 
+-- Create Date: 09/09/2022 06:20:56 PM
+-- Design Name: system top
+-- Module Name: top - Behavioral
+-- Project Name: Music Decoder
+-- Target Devices: Xilinx Basys3
+-- Tool Versions: Vivado 2022.1
+-- Description: 
+-- 
+-- Dependencies: 
+-- 
+-- Revision:
+-- Revision 0.01 - File Created
+-- Additional Comments:
+-- 
+----------------------------------------------------------------------------------
+
+
+library IEEE;
+use IEEE.STD_LOGIC_1164.ALL;
+use ieee.std_logic_unsigned.all;
+
+-- Uncomment the following library declaration if using
+-- arithmetic functions with Signed or Unsigned values
+use IEEE.NUMERIC_STD.ALL;
+
+-- Uncomment the following library declaration if instantiating
+-- any Xilinx leaf cells in this code.
+library UNISIM;
+use UNISIM.VComponents.all;
+
+entity symb_det is
+    Port (  clk: in STD_LOGIC; -- input clock 96kHz
+            clr: in STD_LOGIC; -- input synchronized reset
+            adc_data: in STD_LOGIC_VECTOR(11 DOWNTO 0); -- input 12-bit ADC data
+            symbol_valid: out STD_LOGIC;
+            symbol_out: out STD_LOGIC_VECTOR(2 DOWNTO 0) -- output 3-bit detection symbol
+            );
+end symb_det;
+
+architecture Behavioral of symb_det is
+    signal startbit: std_logic:='0';
+    signal last_signal_amount: integer:=0;
+    signal clock_counter : integer:=0;
+    signal wave_sign_change_counter : integer:=0;
+    signal last_sample: std_logic_vector(11 downto 0):="000000000000";
+    
+begin
+
+    process(clk, clr)
+    begin
+        --get previous value of counting of clock and times of sign change
+    
+        if (clr = '1') then
+            -- clr both counter
+            clock_counter<= 0;
+            wave_sign_change_counter<=0;
+            symbol_valid<= '0';
+            symbol_out<= "000";
+
+        elsif (rising_edge(clk)) then
+        if(startbit = '0') then
+                if(adc_data <="011000000000") then
+                clock_counter <= clock_counter + 1;
+  --                  last_signal_amount <= 1;
+  --                  wave_sign_change_counter <= wave_sign_change_counter +1;
+                startbit <='1';
+            end if;
+         end if;
+            -- for each clk cycle, clock counter + 1
+         if(startbit = '1') then
+            clock_counter <= clock_counter + 1;
+            symbol_valid<= '0';
+            -- 6000 reset clock_counter
+            if (clock_counter = 6000) then
+                clock_counter<= 0;
+                wave_sign_change_counter<=0;
+                symbol_valid<= '0';
+            -- 3000 record the number of waves sign change.
+            elsif (clock_counter = 3000) then
+                -- sin wave *2,  1/32s /2
+                if (wave_sign_change_counter > 60) then
+                    symbol_valid<= '1';
+                    symbol_out<= "000";
+                elsif (wave_sign_change_counter > 50) then
+                    symbol_valid<= '1';
+                    symbol_out<= "001";
+                elsif (wave_sign_change_counter > 41) then
+                    symbol_valid<= '1';
+                    symbol_out<= "010";
+                elsif (wave_sign_change_counter > 33) then
+                    symbol_valid<= '1';
+                    symbol_out<= "011";
+                elsif (wave_sign_change_counter > 25) then
+                    symbol_valid<= '1';
+                    symbol_out<= "100";
+                elsif (wave_sign_change_counter > 22) then
+                    symbol_valid<= '1';
+                    symbol_out<= "101";
+                elsif (wave_sign_change_counter > 18) then
+                    symbol_valid<= '1';
+                    symbol_out<= "110";
+                elsif (wave_sign_change_counter > 10) then
+                    symbol_valid<= '1';
+                    symbol_out<= "111";
+                else
+                    symbol_valid<= '0';
+                    symbol_out<= "000";
+                end if;
+            elsif(clock_counter < 3000) then
+                if(adc_data <="011000000000") then
+                if(last_signal_amount = 0) then
+                
+                last_signal_amount <= 1;
+                wave_sign_change_counter <= wave_sign_change_counter +1;
+                end if;
+                else
+                    last_signal_amount <= 0;
+                end if;
+                
+            else
+            end if;
+            end if;
+        else
+        end if;
+    end process;
+end Behavioral;
